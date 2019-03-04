@@ -1,0 +1,155 @@
+---
+title: '[A4ME] - Production Monitoring'
+author: "Thang Trinh"
+date: "March 1, 2019"
+# ioslides_presentation: default
+# output: html_document
+output:
+  slidy_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r include=FALSE}
+# Clear environment of variables and functions
+rm(list = ls(all = TRUE)) 
+# Clear environmet of packages
+if(is.null(sessionInfo()$otherPkgs) == FALSE)lapply(paste("package:", names(sessionInfo()$otherPkgs), sep=""), detach, character.only = TRUE, unload = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+# Load R package
+if (!require("dplyr")) install.packages("dplyr")
+library("dplyr")
+if (!require("sqldf")) install.packages("sqldf")
+library("sqldf")
+if (!require("kableExtra")) install.packages("kableExtra")
+library("kableExtra")
+if (!require("knitr")) install.packages("knitr")
+library("knitr")
+if (!require("DT")) install.packages("DT")
+library("DT")
+
+reportdate =  as.Date("Feb 14, 19 11:59 pm" , "%b %d, %y %I:%M %p")
+# reportdate = Sys.Date() -18
+```
+
+
+```{r include=FALSE}
+
+# path to folder that holds multiple .csv files
+folder <- "data" 
+
+# create list of all .csv files in folder
+file_list <- list.files(path=folder, pattern="*.csv") 
+
+# init data value
+data = NULL
+
+# combine all data to one object
+for (i in 1:length(file_list)){
+  data = rbind( data,read.csv(paste(folder,'/',file_list[i], sep = ''), header = TRUE,na.strings = "EMPTY", stringsAsFactors = FALSE))
+}
+
+
+
+# Convert factor to Character
+data$Applications = as.character(data$Applications)
+data$System.root.causes = as.character(data$System.root.causes)
+data$Error.message = as.character(data$Error.message)
+data$Countries = as.character(data$Countries)
+data$JIRA.ticket = as.character(data$JIRA.ticket)
+
+# Remove special character then convert to Data Time
+
+data$First =gsub("'", '', data$First, fixed = T)
+data$Last = gsub("'", '', data$First, fixed = T)
+data$First =as.Date(data$First , "%b %d, %y %I:%M %p")
+data$Last =as.Date(data$Last , "%b %d, %y %I:%M %p")
+
+
+#combine 4 column to supper key
+# data$combineColumn =paste(data$Applications , data$System.root.causes , data$Error.message , data$Countries)
+
+
+# sqldf("select min(First), [Applications], [System.root.causes], #[Error.message], [Countries] from old_data group by [Applications], #[System.root.causes], [Error.message], [Countries]")
+
+data_test <- data %>%
+ select(1:10) %>%
+ group_by(Applications, System.root.causes , Error.message, Countries) %>% 
+  summarise(Value = min(First), Number.of.occurences = sum(Number.of.occurences))
+
+data_test$isNew <- ifelse(data_test$Value >= reportdate ,'TRUE', 'FALSE')
+
+
+```
+
+
+New issues today
+=========================================
+```{r}
+data_new_bug <- sqldf("select b.* from data_test a 
+                      left join data as b  
+                      on a.'Applications' = b.'Applications' AND 
+                        a.'System.root.causes' = b.'System.root.causes' AND
+                        a.'Error.message' = b.'Error.message' AND
+                        a.'Countries' = b.'Countries'
+                      where isNew = 'TRUE' ")
+
+
+# kable(data_new_bug) %>%
+#   kable_styling(bootstrap_options = "striped", full_width = F,  font_size = 13)
+datatable(data_new_bug, options = list(pageLength = 5))
+
+```
+
+
+Old bugs without "No impact" type
+=========================================
+```{r}
+data_old_bug <- sqldf("select b.* from data_test a 
+                      left join data as b  
+                      on a.'Applications' = b.'Applications' AND 
+                        a.'System.root.causes' = b.'System.root.causes' AND
+                        a.'Error.message' = b.'Error.message' AND
+                        a.'Countries' = b.'Countries'
+                      where isNew = 'FALSE'
+                      ")
+# kable(data_old_bug) %>%
+#   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), font_size = 13)
+data_old_bug = filter(data_old_bug, data_old_bug$JIRA.ticket != "FALSE" & data_old_bug$JIRA.ticket != "" & data_old_bug$JIRA.ticket != "NA")
+datatable(data_old_bug, options = list(pageLength = 5))
+```
+
+
+Old Issues including no impacts
+=========================================
+```{r}
+data_old_issues <- sqldf("select b.* from data_test a 
+                      left join data as b  
+                      on a.'Applications' = b.'Applications' AND 
+                        a.'System.root.causes' = b.'System.root.causes' AND
+                        a.'Error.message' = b.'Error.message' AND
+                        a.'Countries' = b.'Countries'
+                      where isNew = 'FALSE'
+                      ")
+# kable(data_old_bug) %>%
+#   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), font_size = 13)
+datatable(data_old_issues, options = list(pageLength = 5) ,editable = TRUE )
+```
+
+```{r results="asis"}
+cat("
+<style>
+table.dataTable tbody td {
+ font-size:13px !important;
+}
+</style>
+")
+```
+
+
+
+
