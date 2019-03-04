@@ -5,8 +5,8 @@ navbar:
     left:
     - text: "index"
       href: A4ME_ProductionMonitoring.html
-    - text: "rmarkdown_websites_tutorial"
-      href: rmarkdown_websites_tutorial.html
+    - text: "A4ME_ProductionMonitoring"
+      href: A4ME_ProductionMonitoring.html
     - text: "rmarkdown_websites_tutorial"
       href: rmarkdown_websites_tutorial.html
     - text: "rmarkdown_websites_tutorial"
